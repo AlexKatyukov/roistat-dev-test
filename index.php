@@ -10,31 +10,31 @@ class LogParser
     ];
 
     /** @var string[] */
-    private $log;
+    private $_log;
 
     /** @var int */
-    private $viewsNumber = 0;
+    private $_viewsNumber = 0;
     /** @var string[] */
-    private $urls = [];
+    private $_urls = [];
     /** @var int */
-    private $traffic = 0;
+    private $_traffic = 0;
     /** @var int[] */
-    private $crawlers = [
+    private $_crawlers = [
         'Google' => 0,
         'Bing' => 0,
         'Baidu' => 0,
         'Yandex' => 0,
     ];
     /** @var int[] */
-    private $statusCodesCounts = [];
+    private $_statusCodesCounts = [];
 
     /**
      * @param string $path
      */
     public function __construct(string $path)
     {
-        $this->log = file($path);
-        if (!$this->log) {
+        $this->_log = file($path);
+        if (!$this->_log) {
             throw (new Exception("Can not read file $path"));
         }
     }
@@ -44,16 +44,16 @@ class LogParser
      */
     public function parseFile(): string
     {
-        while (count($this->log) > 0) {
-            $this->parseString(array_shift($this->log));
+        while (count($this->_log) > 0) {
+            $this->parseString(array_shift($this->_log));
         }
 
         $result = [
-            'views' => $this->viewsNumber,
-            'urls' => count($this->urls),
-            'traffic' => $this->traffic,
-            'crawlers' => $this->crawlers,
-            'statusCodes' => $this->statusCodesCounts,
+            'views' => $this->_viewsNumber,
+            'urls' => count($this->_urls),
+            'traffic' => $this->_traffic,
+            'crawlers' => $this->_crawlers,
+            'statusCodes' => $this->_statusCodesCounts,
         ];
 
         return json_encode($result);
@@ -70,9 +70,9 @@ class LogParser
             $traffic = $logParts[3];
             $client = $logParts[4];
 
-            $this->viewsNumber++;
+            $this->_viewsNumber++;
             $this->addUrl($url);
-            $this->traffic += $traffic;
+            $this->_traffic += $traffic;
             $this->findCrawler($client);
             $this->increaseStatusCodeCount($statusCode);
         } else {
@@ -85,8 +85,8 @@ class LogParser
      */
     private function addUrl(string $url): void
     {
-        if (!in_array($url, $this->urls)) {
-            $this->urls[] = $url;
+        if (!in_array($url, $this->_urls)) {
+            $this->_urls[] = $url;
         }
     }
 
@@ -97,7 +97,7 @@ class LogParser
     {
         foreach (self::CRAWLERS_BOT_NAMES as $crawler => $crawlerBotName) {
             if (strpos($client, $crawlerBotName) !== false) {
-                $this->crawlers[$crawler]++;
+                $this->_crawlers[$crawler]++;
                 break;
             }
         }
@@ -105,11 +105,11 @@ class LogParser
 
     private function increaseStatusCodeCount($statusCode): void
     {
-        if (!array_key_exists($statusCode, $this->statusCodesCounts)) {
-            $this->statusCodesCounts[$statusCode] = 0;
+        if (!array_key_exists($statusCode, $this->_statusCodesCounts)) {
+            $this->_statusCodesCounts[$statusCode] = 0;
         }
 
-        $this->statusCodesCounts[$statusCode]++;
+        $this->_statusCodesCounts[$statusCode]++;
     }
 }
 
