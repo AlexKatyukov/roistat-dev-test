@@ -2,7 +2,9 @@
 
 class LogParser
 {
-    private const CRAWLERS = [
+    private const ACCESS_LOG_PATTERN = '/^\S+ \S+ \S+ \[.*?\] "\S+ (\S+).*?" (\d+) (\d+) ".*?" "(.*?)"/';
+
+    private const CRAWLERS_BOT_NAMES = [
         'Google' => 'Googlebot',
         'Yandex' => 'YandexBot',
     ];
@@ -24,7 +26,7 @@ class LogParser
         'Yandex' => 0,
     ];
     /** @var int[] */
-    private $statusCodes = [];
+    private $statusCodesCounts = [];
 
     /**
      * @param string $path
@@ -32,12 +34,15 @@ class LogParser
     public function __construct(string $path)
     {
         $this->log = file($path);
+        if (!$this->log) {
+            throw (new Exception("Can not read file $path"));
+        }
     }
 
     /**
      * @return string
      */
-    public function parse(): string
+    public function parseFile(): string
     {
         while (count($this->log) > 0) {
             $this->parseString(array_shift($this->log));
@@ -48,7 +53,7 @@ class LogParser
             'urls' => count($this->urls),
             'traffic' => $this->traffic,
             'crawlers' => $this->crawlers,
-            'statusCodes' => $this->statusCodes,
+            'statusCodes' => $this->statusCodesCounts,
         ];
 
         return json_encode($result);
@@ -59,18 +64,20 @@ class LogParser
      */
     private function parseString(string $string): void
     {
-        if (preg_match('/^\S+ \S+ \S+ \[.*?\] "\S+ (\S+).*?" (\d+) (\d+) ".*?" "(.*?)"/', $string, $m)) {
-            $url = $m[1];
-            $statusCode = $m[2];
-            $traffic = $m[3];
-            $client = $m[4];
-        }
+        if (preg_match(self::ACCESS_LOG_PATTERN, $string, $logParts)) {
+            $url = $logParts[1];
+            $statusCode = $logParts[2];
+            $traffic = $logParts[3];
+            $client = $logParts[4];
 
-        $this->viewsNumber++;
-        $this->addUrl($url);
-        $this->traffic += $traffic;
-        $this->findCrawler($client);
-        $this->statusCodes[$statusCode]++;
+            $this->viewsNumber++;
+            $this->addUrl($url);
+            $this->traffic += $traffic;
+            $this->findCrawler($client);
+            $this->increaseStatusCodeCount($statusCode);
+        } else {
+            throw (new Exception("Incorrect string in log: $string"));
+        }
     }
 
     /**
@@ -88,16 +95,25 @@ class LogParser
      */
     private function findCrawler(string $client): void
     {
-        foreach (self::CRAWLERS as $crawler => $crawlerBotName) {
+        foreach (self::CRAWLERS_BOT_NAMES as $crawler => $crawlerBotName) {
             if (strpos($client, $crawlerBotName) !== false) {
                 $this->crawlers[$crawler]++;
                 break;
             }
         }
     }
+
+    private function increaseStatusCodeCount($statusCode): void
+    {
+        if (!array_key_exists($statusCode, $this->statusCodesCounts)) {
+            $this->statusCodesCounts[$statusCode] = 0;
+        }
+
+        $this->statusCodesCounts[$statusCode]++;
+    }
 }
 
 /** @var string[] $argv */
 
 $parser = new LogParser($argv[1]);
-echo $parser->parse();
+echo $parser->parseFile();
