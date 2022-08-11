@@ -11,6 +11,8 @@ class LogParser
 
     /** @var string[] */
     private $_log;
+    /** @var int */
+    private $_filePosition;
 
     /** @var int */
     private $_viewsNumber = 0;
@@ -30,10 +32,11 @@ class LogParser
 
     /**
      * @param string $path
+     * @throws Exception
      */
     public function __construct(string $path)
     {
-        $this->_log = file($path);
+        $this->_log = fopen($path, 'r');
         if (!$this->_log) {
             throw (new Exception("Can not read file $path"));
         }
@@ -41,11 +44,13 @@ class LogParser
 
     /**
      * @return string
+     * @throws Exception
      */
     public function parseFile(): string
     {
-        while (count($this->_log) > 0) {
-            $this->parseString(array_shift($this->_log));
+        while ($this->_filePosition !== ftell($this->_log)) {
+            $string = $this->getString();
+            $this->parseString($string);
         }
 
         $result = [
@@ -60,7 +65,17 @@ class LogParser
     }
 
     /**
+     * @return string
+     */
+    private function getString(): string
+    {
+        $this->_filePosition = ftell($this->_log);
+        return fgets($this->_log);
+    }
+
+    /**
      * @param string $string
+     * @throws Exception
      */
     private function parseString(string $string): void
     {
@@ -75,7 +90,7 @@ class LogParser
             $this->_traffic += $traffic;
             $this->findCrawler($client);
             $this->increaseStatusCodeCount($statusCode);
-        } else {
+        } elseif ($string !== '') {
             throw (new Exception("Incorrect string in log: $string"));
         }
     }
@@ -103,7 +118,10 @@ class LogParser
         }
     }
 
-    private function increaseStatusCodeCount($statusCode): void
+    /**
+     * @param int $statusCode
+     */
+    private function increaseStatusCodeCount(int $statusCode): void
     {
         if (!array_key_exists($statusCode, $this->_statusCodesCounts)) {
             $this->_statusCodesCounts[$statusCode] = 0;
@@ -115,5 +133,11 @@ class LogParser
 
 /** @var string[] $argv */
 
-$parser = new LogParser($argv[1]);
-echo $parser->parseFile();
+try {
+    $parser = new LogParser($argv[1]);
+    echo $parser->parseFile();
+} catch (Exception $e) {
+    echo json_encode([
+        'error' => $e->getMessage(),
+    ]);
+}
